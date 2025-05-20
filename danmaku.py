@@ -66,22 +66,87 @@ class Player(pg.sprite.Sprite):
         screen.blit(self.image, self.rect)
 
 
+class Boss(pg.sprite.Sprite):
+    """
+    ボスに関するクラス
+    """
+    def __init__(self):
+        super().__init__()
+        self.image = pg.image.load(f"fig/3.png")
+        self.rect = self.image.get_rect()
+        self.rect.center = 1200,HEIGHT/2
+        self.vx, self.vy = 0,0
+        self.stop_xy =[900,HEIGHT/2]  # 停止位置を指定
+        self.movestate = "moving"  #初期状態
+        self.state,self.state_num = "move",0
+        self.image = pg.transform.scale(self.image,(200,200))
+        self.hp=1000
+    def update(self):
+        if self.state == "move" and self.movestate == "stop":#上下に動く
+            self.vy+=0.05
+            if self.state_num==0:
+                self.rect.move_ip(0,self.vy)
+            if self.state_num==1:
+                self.rect.move_ip(0,-self.vy)
+            if self.rect.centery < 150 and self.state_num == 1:
+                self.state_num = 0
+                self.vy=0
+            if self.rect.centery > HEIGHT-150 and self.state_num == 0:
+                self.state_num = 1
+                self.vy=0
+                
+        if self.movestate != "stop": #停止位置まで移動
+            self.vx+=0.4 #加速度
+            self.vy+=0.4
+            if self.rect.centerx < self.stop_xy[0]:
+                self.rect.move_ip(self.vx,0)
+                if self.rect.centerx > self.stop_xy[0]:
+                    self.rect.centerx = self.stop_xy[0]
+            if self.rect.centerx > self.stop_xy[0]:
+                self.rect.move_ip(-self.vx,0)
+                if self.rect.centerx < self.stop_xy[0]:
+                    self.rect.centerx = self.stop_xy[0]
+            if self.rect.centery < self.stop_xy[1]:
+                self.rect.move_ip(0,self.vy)
+                if self.rect.centery < self.stop_xy[1]:
+                    self.rect.centery = self.stop_xy[1]
+            if self.rect.centery > self.stop_xy[1]:
+                self.rect.move_ip(0,-self.vy)
+                if self.rect.centery < self.stop_xy[1]:
+                    self.rect.centery = self.stop_xy[1]
+            if self.rect.centerx == self.stop_xy[0] and self.rect.centery == self.stop_xy[1]:
+                self.movestate = "stop"
+                self.vx=0
+                self.vy=0
+            
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/26466996.jpg")
 
     player = Player((900, 400))
-
+    boss = pg.sprite.Group()
+    boss.add(Boss())#こうかとんを出現
     tmr = 0
     clock = pg.time.Clock()
+     #----デバック用テキスト----
+    fonto = pg.font.Font(None, 20)
+    txt = fonto.render("test", False, (255, 255, 255))
+    #------------------------
     while True:
         screen.blit(bg_img, [0,0])
+         #----デバック用テキスト----
+        if boss.sprites():
+            txt = fonto.render(f"{boss.sprites()[0].rect,boss.sprites()[0].rect.center,boss.sprites()[0].movestate}", False, (255, 255, 255))
+
+        screen.blit(txt, [0, 0])
+        #------------------------
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-
+        boss.update()
+        boss.draw(screen)
         player.update(key_lst, screen)
         pg.display.update()
         tmr += 1
