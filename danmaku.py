@@ -25,6 +25,39 @@ def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     return yoko, tate
 
 
+def gameover(screen: pg.Surface) -> None:
+    """
+    引数：screen
+    半透明の四角形とGameOverの文字列、
+    """
+    black_out_img = pg.Surface((WIDTH, HEIGHT))
+    pg.draw.rect(black_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
+    black_out_img.set_alpha(100)
+    fonto = pg.font.Font(None, 80)
+    txt = fonto.render("GameOver", True, (255, 255, 255))
+   
+    screen.blit(black_out_img,(0, 0))
+    screen.blit(txt, (400, 250))
+    pg.display.update()
+    time.sleep(5)
+
+def gameclear(screen: pg.Surface) -> None:
+    """
+    引数：screen
+    Congratulations!!の表示
+    """
+    clear_out_img = pg.Surface((WIDTH,HEIGHT))
+    pg.draw.rect(clear_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
+    clear_out_img.set_alpha(0)
+    fonto = pg.font.Font(None, 80)
+    txt = fonto.render("Congratulations!!", True, (255, 255, 255))
+    
+    screen.blit(clear_out_img,(0, 0))
+    screen.blit(txt, (300, 250))
+    pg.display.update()  
+    time.sleep(5)
+
+
 class Player(pg.sprite.Sprite):
     """
     ゲームキャラクターに関するクラス
@@ -67,7 +100,7 @@ class Player(pg.sprite.Sprite):
 
 
 def main():
-    pg.display.set_caption("真！こうかとん無双")
+    pg.display.set_caption("爆散！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/26466996.jpg")
 
@@ -81,6 +114,9 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            if event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE:
+                gameclear(screen)
+                return
 
         player.update(key_lst, screen)
         pg.display.update()
