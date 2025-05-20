@@ -65,6 +65,65 @@ class Player(pg.sprite.Sprite):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         screen.blit(self.image, self.rect)
 
+class Beam(pg.sprite.Sprite):
+    """
+      機体が放つビームに関するクラス
+    """
+    def __init__(self, player:"Player"):
+        """
+        ビーム画像Surfaceを生成する
+        引数 player：ビームを放つ機体（Playerインスタンス）
+        """
+        self.img = pg.image.load(f"fig/beam.png")
+        self.rct = self.img.get_rect()
+        self.rct.centery = player.rect.centery
+        self.rct.left = player.rect.right
+        self.vx, self.vy = +5, 0
+
+    def update(self, screen: pg.Surface):
+        """
+        ビームを速度ベクトルself.vx, self.vyに基づき移動させる
+        引数 screen：画面Surface
+        """
+        if check_bound(self.rct) == (True, True):
+            self.rct.move_ip(self.vx, self.vy)
+            screen.blit(self.img, self.rct)
+
+class Item(pg.sprite.Sprite):
+    """
+    アイテムに関するクラス
+    """
+    imgs = [pg.image.load(f"fig/item{i}.png") for i in range(1, 4)]
+    
+    def __init__(self):
+        super().__init__()
+        self.image = pg.transform.rotozoom(random.choice(__class__.imgs), 0, 0.8)
+        self.rect = self.image.get_rect()
+        self.rect.center = random.randint(0, WIDTH), 0 
+
+    def update(self):
+        """
+        敵機を速度ベクトルself.vyに基づき移動（降下）させる
+        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
+        引数 screen：画面Surface
+        """
+        if self.rect.centery > self.bound:
+            self.vy = 0
+            self.state = "stop"
+        self.rect.move_ip(self.vx, self.vy)
+
+
+#機体は残基で決まっており、一発くらうと残基が1つ減る
+#現在の想定
+
+# ランダムな時間でランダムな位置にアイテムを出現させる
+# 右下あたりに入手したアイテムのリストを表示させる
+# A、Dなどのキーでリストの左右移動
+# アイテムの種類
+# 機体の周りに一度だけ当たれるバリアを生成する
+# 一定時間、ビームのクールタイムを減らす
+# ビームがボムに変わる    
+
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -72,7 +131,9 @@ def main():
     bg_img = pg.image.load(f"fig/26466996.jpg")
 
     player = Player((900, 400))
-
+    beams = []
+    beam_cool_time = 800 #ビームのクールタイム
+    last_beam_time = 0   #最後に打ったビームの時間
     tmr = 0
     clock = pg.time.Clock()
     while True:
@@ -81,8 +142,21 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            
+        current_time = pg.time.get_ticks() #現在の時間
+            
+        if key_lst[pg.K_SPACE]:    #スペースキー長押しでビーム投下
+            if current_time - last_beam_time >= beam_cool_time:
+                last_beam_time = current_time   
+                beams.append(Beam(player))    
+
+        for i, beam in enumerate(beams):
+            beams = [ beam for beam in beams if beam is not None]
+
 
         player.update(key_lst, screen)
+        for beam in beams: 
+            beam.update(screen)  
         pg.display.update()
         tmr += 1
         clock.tick(50)
