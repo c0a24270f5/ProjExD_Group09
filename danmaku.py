@@ -48,6 +48,7 @@ class Player(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.hp = 3
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
@@ -65,6 +66,43 @@ class Player(pg.sprite.Sprite):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         screen.blit(self.image, self.rect)
 
+class My_Life(pg.sprite.Sprite):
+    """
+    自機のHP表示に関するクラス
+    """
+    def __init__(self, player: Player):
+        super().__init__()
+        self.player = player  
+        self.font = pg.font.Font(None, 40)
+        self.image = pg.Surface((player.hp * 60, 20))
+        pg.draw.rect(self.image, (0, 0, 255), (0, 0, player.hp * 60, 20))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (5, 5)
+
+
+    def update(self):
+        hp = self.player.hp
+        bar_width = max(hp * 60, 1)
+        bar_height = 20
+        text_height = 25
+        total_height = bar_height + text_height
+
+        # 新しいSurfaceを作成（透明背景）
+        self.image = pg.Surface((bar_width + 100, total_height), pg.SRCALPHA)
+        self.image.fill((0, 0, 0, 0))
+
+        # ライフバーを描画
+        pg.draw.rect(self.image, (0, 0, 255), (0, 0, bar_width, bar_height))
+
+        # HP数値を描画
+        text = self.font.render(f"HP: {hp}", True, (255, 255, 255))
+        self.image.blit(text, (0, bar_height))
+
+        # rectも更新
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (5, 5)
+
+
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -72,6 +110,10 @@ def main():
     bg_img = pg.image.load(f"fig/26466996.jpg")
 
     player = Player((900, 400))
+    my_life = pg.sprite.Group()
+    my_life_bar = My_Life(player)
+    my_life.add(my_life_bar)
+
 
     tmr = 0
     clock = pg.time.Clock()
@@ -83,6 +125,10 @@ def main():
                 return 0
 
         player.update(key_lst, screen)
+
+        my_life.update()
+        my_life.draw(screen)
+
         pg.display.update()
         tmr += 1
         clock.tick(50)
