@@ -34,7 +34,7 @@ def gameover(screen: pg.Surface) -> None:
     pg.draw.rect(black_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
     black_out_img.set_alpha(100)
     fonto = pg.font.Font(None, 80)
-    txt = fonto.render("GameOver", True, (255, 255, 255))
+    txt = fonto.render("GameOver", True, (255, 255, 255))  # 文字の設定
    
     screen.blit(black_out_img,(0, 0))
     screen.blit(txt, (400, 250))
@@ -50,7 +50,7 @@ def gameclear(screen: pg.Surface) -> None:
     pg.draw.rect(clear_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
     clear_out_img.set_alpha(0)
     fonto = pg.font.Font(None, 80)
-    txt = fonto.render("Congratulations!!", True, (255, 255, 255))
+    txt = fonto.render("Congratulations!!", True, (255, 255, 255))  # 文字の設定
     
     screen.blit(clear_out_img,(0, 0))
     screen.blit(txt, (300, 250))
