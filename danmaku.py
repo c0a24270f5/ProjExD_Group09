@@ -115,7 +115,7 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE:
-                gameclear(screen)
+                gameclear(screen)  # 敵や爆弾の設定が出来次第、条件は変更
                 return
 
         player.update(key_lst, screen)
