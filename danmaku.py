@@ -48,6 +48,9 @@ class Player(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.triple_beam_tmr = 0 #三方向ビームの時間
+        self.fast_beam_tmr = 0 #ビームのクールタイムが短くなる時間
+        self.shield_tmr = 0 #バリアの時間
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
@@ -65,11 +68,12 @@ class Player(pg.sprite.Sprite):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         screen.blit(self.image, self.rect)
 
+
 class Beam(pg.sprite.Sprite):
     """
       機体が放つビームに関するクラス
     """
-    def __init__(self, player:"Player"):
+    def __init__(self, player:"Player", angle = 0):
         """
         ビーム画像Surfaceを生成する
         引数 player：ビームを放つ機体（Playerインスタンス）
@@ -78,16 +82,19 @@ class Beam(pg.sprite.Sprite):
         self.rct = self.img.get_rect()
         self.rct.centery = player.rect.centery
         self.rct.left = player.rect.right
-        self.vx, self.vy = +5, 0
+        rad = math.radians(angle)
+        self.vx = 5 * math.cos(rad)
+        self.vy = 5 * math.sin(rad)
 
     def update(self, screen: pg.Surface):
         """
         ビームを速度ベクトルself.vx, self.vyに基づき移動させる
         引数 screen：画面Surface
         """
+        self.rct.move_ip(self.vx, self.vy)
         if check_bound(self.rct) == (True, True):
-            self.rct.move_ip(self.vx, self.vy)
             screen.blit(self.img, self.rct)
+
 
 class Item(pg.sprite.Sprite):
     """
@@ -95,35 +102,30 @@ class Item(pg.sprite.Sprite):
     """
     imgs = [pg.image.load(f"fig/item{i}.png") for i in range(1, 4)]
     
-    def __init__(self):
+    def __init__(self, spawn_frame: int):
         super().__init__()
-        self.image = pg.transform.rotozoom(random.choice(__class__.imgs), 0, 0.8)
+        self.item_type = random.randint(1, 3)
+        self.image = pg.transform.rotozoom(__class__.imgs[self.item_type-1], 0, 0.04)
         self.rect = self.image.get_rect()
-        self.rect.center = random.randint(0, WIDTH), 0 
+        img_width = self.rect.width
+        img_height = self.rect.height
+        x = random.randint(img_width // 2, WIDTH - img_width // 2)
+        y = random.randint(img_height // 2, HEIGHT - img_height // 2)
+        self.rect.center = (x, y)
+        self.vx, self.vy = 0, 0
+        self.spawn_frame = spawn_frame
+        
 
-    def update(self):
+    def update(self, screen: pg.Surface, tmr: int):
         """
-        敵機を速度ベクトルself.vyに基づき移動（降下）させる
-        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
-        引数 screen：画面Surface
+        アイテムがあるかどうかの確認
+        戻り値：画面内にアイテムがあるか
         """
-        if self.rect.centery > self.bound:
-            self.vy = 0
-            self.state = "stop"
-        self.rect.move_ip(self.vx, self.vy)
-
-
-#機体は残基で決まっており、一発くらうと残基が1つ減る
-#現在の想定
-
-# ランダムな時間でランダムな位置にアイテムを出現させる
-# 右下あたりに入手したアイテムのリストを表示させる
-# A、Dなどのキーでリストの左右移動
-# アイテムの種類
-# 機体の周りに一度だけ当たれるバリアを生成する
-# 一定時間、ビームのクールタイムを減らす
-# ビームがボムに変わる    
-
+        if tmr - self.spawn_frame >= 200:
+            return False
+        screen.blit(self.image, self.rect)
+        return True
+    
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -132,8 +134,10 @@ def main():
 
     player = Player((900, 400))
     beams = []
-    beam_cool_time = 800 #ビームのクールタイム
+    items = []
     last_beam_time = 0   #最後に打ったビームの時間
+    last_item_spawn = 0  #最後に現れたアイテムの時間
+    next_spawn_interval = 200 #次にアイテムが出るまでの時間
     tmr = 0
     clock = pg.time.Clock()
     while True:
@@ -144,17 +148,55 @@ def main():
                 return 0
             
         current_time = pg.time.get_ticks() #現在の時間
+
+        if player.fast_beam_tmr > 0:
+            beam_cool_tmr = 400 #ビームのクールタイム（アイテム使用時）
+        else:
+            beam_cool_tmr = 800 #ビームのクールタイム（通常）
             
         if key_lst[pg.K_SPACE]:    #スペースキー長押しでビーム投下
-            if current_time - last_beam_time >= beam_cool_time:
+            if current_time - last_beam_time >= beam_cool_tmr:
                 last_beam_time = current_time   
-                beams.append(Beam(player))    
+                beams.append(Beam(player)) 
+                if player.triple_beam_tmr > 0: #三方向にビームを出す
+                    for angle in [0, 30, -30]:
+                        beams.append(Beam(player, angle))
+                else:
+                    beams.append(Beam(player)) #通常のビーム
+
+        if player.shield_tmr > 0:
+            pg.draw.circle(screen, (0, 255, 255), player.rect.center, 60, 5)
+
+        if tmr - last_item_spawn >= next_spawn_interval:
+            items.append(Item(tmr))
+            last_item_spawn = tmr
+            next_spawn_interval = random.randint(400, 600) #次のアイテムが400~600フレームの間に出現する
+
+        for item in items:
+            if player.rect.colliderect(item.rect):
+                if item.item_type == 1:
+                    player.triple_beam_tmr = 200 #200フレームの間三方向ビーム
+
+                elif item.item_type == 2:
+                    player.fast_beam_tmr = 200
+
+                elif item.item_type == 3:
+                    player.shield_tmr = 200
+                items.remove(item)
+
 
         for i, beam in enumerate(beams):
             beams = [ beam for beam in beams if beam is not None]
 
+        if player.triple_beam_tmr > 0:
+            player.triple_beam_tmr -= 1
+        if player.fast_beam_tmr >0:
+            player.fast_beam_tmr -= 1
+        if player.shield_tmr > 0:
+            player.shield_tmr -= 1
 
         player.update(key_lst, screen)
+        items = [item for item in items if item.update(screen, tmr)]          
         for beam in beams: 
             beam.update(screen)  
         pg.display.update()
