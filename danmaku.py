@@ -663,11 +663,12 @@ def main():
         my_life.draw(screen)
         boss_life.update()
         boss_life.draw(screen)
-
+  # --------------デバッグ用コード-----------------
         print(f" timer = {tmr}                      speed = {int(scrollspeed)}")
         pg.display.update()
         tmr += 1
         clock.tick(50)
+  # ---------------------------------------------
 
 
 if __name__ == "__main__":
