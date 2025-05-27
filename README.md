@@ -29,9 +29,6 @@
 - 敵のHPに関するクラスの作成(内容は味方用とほぼ同じ)
 
 ### メモ
-<<<<<<< HEAD
-* gameoverとgameclearの関数の条件付けは敵の環境が出来次第
-=======
 * * ボスのHPは　boss.sprites()[0].hp　で取得
 追加したクラス
 check_inscreen(obj_rct: pg.Rect) -> tuple[bool, bool]
@@ -51,7 +48,6 @@ Bosscolor(pg.sprite.Sprite)
 
 Danmaku(pg.sprite.Sprite)
 弾幕に関するクラス
->>>>>>> C0A24086/boss
 # 弾幕ゲーム
 
 ## 実行環境
