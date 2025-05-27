@@ -29,4 +29,26 @@
 - 敵のHPに関するクラスの作成(内容は味方用とほぼ同じ)
 
 ### メモ
+<<<<<<< HEAD
 * gameoverとgameclearの関数の条件付けは敵の環境が出来次第
+=======
+* * ボスのHPは　boss.sprites()[0].hp　で取得
+追加したクラス
+check_inscreen(obj_rct: pg.Rect) -> tuple[bool, bool]
+ オブジェクトが画面外かを判定し，真理値タプルを返す関数
+
+calc_orientation(org,dst)
+ orgから見てdstがどこにあるかを計算し方向ベクトルをタプルで返す
+
+facing(self_rect, player_rect) 
+ self_rectがplayer_rectの方向を向く角度を計算してangleを返す
+
+Boss(pg.sprite.Sprite)
+ボスに関するクラス
+
+Bosscolor(pg.sprite.Sprite)
+ボスの色を変えるクラス
+
+Danmaku(pg.sprite.Sprite)
+弾幕に関するクラス
+>>>>>>> C0A24086/boss
