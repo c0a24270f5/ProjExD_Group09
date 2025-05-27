@@ -347,7 +347,7 @@ class Boss(pg.sprite.Sprite):
                     self.keep_xy[0]=self.rect.centerx
                     self.random[2]=random.randint(0,90)+45
                     self.random[3]=self.random[2]+180
-                if self.rect.centerx<self.keep_xy[0]-120*self.state_num+1 and self.vx<-1:
+                if self.rect.centerx<self.keep_xy[0]-180*self.state_num+1 and self.vx<-1:#180が弾幕のx軸の感覚
                     self.state_num+=1
                     danmaku.add(Danmaku("danmaku",self.rect,self.random[2],WIDTH-30*self.state_num+1))
                     danmaku.add(Danmaku("danmaku",self.rect,self.random[3],WIDTH-30*self.state_num+1))
@@ -587,7 +587,13 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            
+        for danmaku_hit in pg.sprite.spritecollide(player, danmaku, True):  # プレイやーと衝突した弾幕リスト
+            if player.shield_tmr == 0:
+                player.hp-=1#プレイヤーが当たった時にhp-1
+        for baem in beams:
+            if boss.sprites()[0].rect.colliderect(baem.rct):
+                boss.sprites()[0].hp-=1
+                beams.remove(baem)
         current_time = pg.time.get_ticks() #現在の時間
 
         if player.fast_beam_tmr > 0:
@@ -622,7 +628,7 @@ def main():
                     player.fast_beam_tmr = 200
 
                 elif item.item_type == 3:
-                    player.shield_tmr = 200
+                    player.shield_tmr = 300
                 items.remove(item)
 
 
