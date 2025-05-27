@@ -23,6 +23,16 @@ def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     if obj_rct.top < 0 or HEIGHT < obj_rct.bottom:
         tate = False
     return yoko, tate
+def check_inscreen(obj_rct: pg.Rect) -> tuple[bool, bool]:
+    """
+    オブジェクトが画面外かを判定し，真理値タプルを返す関数
+    """
+    yoko, tate = True, True
+    if obj_rct.right < 0 or WIDTH < obj_rct.left:
+        yoko = False
+    if obj_rct.bottom < 0 or HEIGHT < obj_rct.top:
+        tate = False
+    return yoko, tate
 
 
 class Player(pg.sprite.Sprite):
@@ -65,6 +75,36 @@ class Player(pg.sprite.Sprite):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         screen.blit(self.image, self.rect)
 
+def calc_orientation(org,dst):
+    """
+    orgから見てdstがどこにあるかを計算し方向ベクトルをタプルで返す
+    戻り値：orgから見たdstの方向ベクトルを表すタプル
+    """
+    x_diff, y_diff = dst[0]-org[0], dst[1]-org[1]
+    norm = math.sqrt(x_diff**2+y_diff**2)
+    if norm == 0:  # ゼロ除算を防ぐ
+        return 0, 0
+    return x_diff/norm, y_diff/norm
+
+
+def facing(self_rect, player_rect):
+    """
+    self_rectがplayer_rectの方向を向く角度を計算してangleを返す
+    """
+    dx = player_rect.centerx - self_rect.centerx
+    dy = player_rect.centery - self_rect.centery
+    angle = math.degrees(math.atan2(-dy, dx))  # 反時計回りで計算
+    return angle
+
+def anglevector(angle):
+    """
+    angleのほう歩行に進むvx, vyを返す
+    """
+    radian = math.radians(angle)  # 角度をラジアンに変換
+    vx = math.cos(radian)  # X方向の速度
+    vy = -math.sin(radian) # Y方向の速度 (画面座標系に合わせるため符号を反転)
+    return [vx, vy]
+
 
 class Boss(pg.sprite.Sprite):
     """
@@ -74,51 +114,263 @@ class Boss(pg.sprite.Sprite):
         super().__init__()
         self.image = pg.image.load(f"fig/3.png")
         self.rect = self.image.get_rect()
-        self.rect.center = 1200,HEIGHT/2
-        self.vx, self.vy = 0,0
-        self.stop_xy =[900,HEIGHT/2]  # 停止位置を指定
-        self.movestate = "moving"  #初期状態
-        self.state,self.state_num = "move",0
+        self.rect.center = 1200,HEIGHT/2-50
+        self.state,self.state_num = "start",0
         self.image = pg.transform.scale(self.image,(200,200))
-        self.hp=1000
-    def update(self):
-        if self.state == "move" and self.movestate == "stop":#上下に動く
-            self.vy+=0.05
-            if self.state_num==0:
-                self.rect.move_ip(0,self.vy)
-            if self.state_num==1:
-                self.rect.move_ip(0,-self.vy)
-            if self.rect.centery < 150 and self.state_num == 1:
-                self.state_num = 0
-                self.vy=0
-            if self.rect.centery > HEIGHT-150 and self.state_num == 0:
-                self.state_num = 1
-                self.vy=0
-                
-        if self.movestate != "stop": #停止位置まで移動
-            self.vx+=0.4 #加速度
-            self.vy+=0.4
-            if self.rect.centerx < self.stop_xy[0]:
-                self.rect.move_ip(self.vx,0)
-                if self.rect.centerx > self.stop_xy[0]:
-                    self.rect.centerx = self.stop_xy[0]
+        self.stop_xy =[900,HEIGHT/2-50]  # 停止位置を指定 
+        self.vx, self.vy,self.vx_sub, self.vy_sub = 0,0,0,0
+        self.danmaku_cooltime=100
+        self.cooltime=0
+        self.maxhp=1000
+        self.hp=self.maxhp
+        self.count=0
+        self.speed=10
+        self.speed_sub=0
+        self.random=[0,0,0,0]#[x,y,angle1,angle2]
+        self.keep_xy=[0,0]
+        self.state_dict={
+            0:"attack0",
+            1:"attack1",
+            2:"attack2",
+            3:"attack3",
+            4:"attack4",
+            5:"attack5"
+        }
+        
+    def update(self,screen,danmaku,playerrect):
+        self.count+=1
+        if self.state != "attack4":
+            if abs(self.rect.centerx - self.random[0]) < abs(self.speed* self.vx) or abs(self.rect.centery - self.random[1]) < abs(self.speed* self.vy):
+                    self.vx,self.vy=0,0 #停止位置で止まる
+        self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
+        if self.speed_sub != 0:
+            self.rect.move_ip(self.speed_sub*self.vx_sub,self.speed_sub*self.vy_sub)
+
+        if self.state == "reset":
+            self.speed=6
+            self.speed_sub=0
+            self.count = 1
+            self.state_num=0
+            self.state = "random"
+
+        if self.state == "random":
+            self.image = pg.image.load(f"fig/3.png")
+            self.image = pg.transform.scale(self.image,(200,200))
+            if  self.count%20==0:
+                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+                self.random[1]=random.randint(0,HEIGHT)
+            if self.rect.centerx != self.random[0] and self.rect.centery != self.random[1]:
+                self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
+            if self.rect.centerx == self.random[0] and self.rect.centery == self.random[1]:
+                self.vx,self.vy=0,0
+            if self.count>=self.cooltime:
+                self.cooltime=0
+                self.count = 1
+                self.state=self.state_dict[random.randint(1,5)] #攻撃ランダム
+                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+                self.random[1]=random.randint(0,HEIGHT)
+
+        if self.state == "start":
+            self.hp=self.maxhp
             if self.rect.centerx > self.stop_xy[0]:
-                self.rect.move_ip(-self.vx,0)
+                self.rect.move_ip(-1,0)
                 if self.rect.centerx < self.stop_xy[0]:
                     self.rect.centerx = self.stop_xy[0]
-            if self.rect.centery < self.stop_xy[1]:
-                self.rect.move_ip(0,self.vy)
-                if self.rect.centery < self.stop_xy[1]:
-                    self.rect.centery = self.stop_xy[1]
-            if self.rect.centery > self.stop_xy[1]:
-                self.rect.move_ip(0,-self.vy)
-                if self.rect.centery < self.stop_xy[1]:
-                    self.rect.centery = self.stop_xy[1]
-            if self.rect.centerx == self.stop_xy[0] and self.rect.centery == self.stop_xy[1]:
-                self.movestate = "stop"
-                self.vx=0
-                self.vy=0
+            if self.rect.centerx == self.stop_xy[0] and self.count==500:
+                self.state = "reset"
+
+        if self.state=="attack1":   #ミサイル1
+            self.speed=4
+            self.danmaku_cooltime=50
+            self.image = pg.image.load(f"fig/9.png")
+            if self.count%200==1:
+                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+                self.random[1]=random.randint(0,HEIGHT)
+            if self.danmaku_cooltime*3/5>self.count%self.danmaku_cooltime>0:
+                self.speed_sub+=0.8
+            if self.count%self.danmaku_cooltime==self.danmaku_cooltime*3/5:
+                self.speed_sub=0
+            if self.danmaku_cooltime>self.count%self.danmaku_cooltime>self.danmaku_cooltime*3/5:
+                self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
+            if self.count%self.danmaku_cooltime==0:
+                self.speed_sub=-10
+                self.vx_sub,self.vy_sub=anglevector(facing(self.rect,playerrect))
+                danmaku.add(Danmaku("missile",self.rect,0))
+            if self.count>200:
+                self.cooltime=100
+                self.state = "reset"
+
+        if self.state=="attack2":   #ミサイル２
+            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
+            self.danmaku_cooltime=13
+            self.image = pg.image.load(f"fig/3.png")
+            self.image = pg.transform.scale(self.image,(200,200))
+            if self.count==1:
+                self.speed=4
+                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+                self.random[1]=0
+            if self.rect.centery<10:
+                self.speed=9
+                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+                self.random[1]=HEIGHT
+                self.state_num=1
+            if self.state_num==1:
+                self.image = pg.image.load(f"fig/9.png")
+                if self.count%self.danmaku_cooltime==0:
+                    danmaku.add(Danmaku("missile",self.rect,0))
+            if self.rect.centery>HEIGHT-10:
+                self.cooltime=100   
+                self.state = "reset"
+
+        if self.state=="attack3":   #円形弾幕
+            self.speed = 6
+            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
+            if  self.count%40==0:
+                self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
+                self.random[1]=random.randint(0,HEIGHT)
+            if self.count%50==0:
+                self.image = pg.image.load(f"fig/6.png")
+                self.state_num+=1
+                for i in range(27):#弾幕の数
+                    danmaku.add(Danmaku("danmaku",self.rect,(i-180)*15))#弾幕を発射
+            if self.count >200:#countが200以上で終了
+                self.cooltime=100
+                self.state = "reset"
+
+        if self.state=="attack4": #突進弾幕
+            if self.count==1:
+                self.vx,self.vy=0,-2#上に行く
+            if check_bound(self.rect) == (True, False):#画面恥に行ったらｖyを反転
+                self.vy=self.vy*-1
+            if self.count==110:
+                self.vx,self.vy=3,0
+            if self.count>110:
+                self.vx-=0.2
+            if self.vx<0:
+                if self.vx>-1:
+                    self.keep_xy[0]=self.rect.centerx
+                    self.random[2]=random.randint(0,90)+45
+                    self.random[3]=self.random[2]+180
+                if self.rect.centerx<self.keep_xy[0]-120*self.state_num+1 and self.vx<-1:
+                    self.state_num+=1
+                    danmaku.add(Danmaku("danmaku",self.rect,self.random[2],WIDTH-30*self.state_num+1))
+                    danmaku.add(Danmaku("danmaku",self.rect,self.random[3],WIDTH-30*self.state_num+1))
+                if self.vx<-5:
+                    if check_bound(self.rect) == (False, False) or check_bound(self.rect) == (False, True) :
+                        self.cooltime=200
+                        self.state = "reset"
+        if self.state=="attack5": #ビーム
+            self.speed = 6
+            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
+            if  self.count%40==0:
+                self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
+                self.random[1]=random.randint(0,HEIGHT)
+            if self.count==100:
+                self.image = pg.image.load(f"fig/6.png")
+                self.state_num+=1
+                danmaku.add(Danmaku("beam",self.rect,random.randint(0,140)-210))#弾幕を発射
+            if self.count >200:#countが200以上で終了
+                self.cooltime=100
+                self.state = "reset"
+                        
+
+        screen.blit(self.image,self.rect) 
             
+
+
+class Bosscolor(pg.sprite.Sprite):
+    """
+    ボスの色を変えるクラス
+    """
+    def __init__(self,bossrect,color):
+        super().__init__()
+        self.image = pg.image.load(f"fig/3.png").convert_alpha()
+        self.rect = bossrect
+        self.image = pg.transform.scale(self.image,(200,200))
+        self.image.fill(color, special_flags=pg.BLEND_RGB_MULT)
+        self.alpha=255
+        self.num=0
+    def update(self,screen,bossrect,count):
+        self.num+=0.03
+        if self.alpha > 0 and count > 400:
+            self.alpha -= self.num
+        self.image.set_alpha(self.alpha)
+        screen.blit(self.image,bossrect) 
+
+
+class Danmaku(pg.sprite.Sprite):
+    """
+    弾幕に関するクラス
+    """
+    def __init__(self,type,bossrect,angle,summonx=0):
+        super().__init__()
+        self.type=type
+        self.danmaku_type={ #名前：[画像,サイズ,スピード]
+            "missile":["fig/missile.png",(160,70),0],
+            "danmaku":["fig/circle.png",(48,12),6.44],
+            "beam":["fig/circle.png",(120,120),10]
+            }
+        self.bound={
+            (True,True):[1,1],
+            (True,False):[1,-1],
+            (False,True):[-1,1],
+            (False,False):[-1,-1]
+        }
+        if self.danmaku_type[type][0] != "None":
+            self.image = pg.image.load(self.danmaku_type[type][0]).convert_alpha()
+        if self.danmaku_type[type][0] == "None":
+            self.image =  pg.Surface(self.danmaku_type[type][1])
+        self.vx,self.vy=0,0
+        self.rad = math.radians(angle)
+        self.rect = self.image.get_rect()
+        self.rect.topleft = bossrect.topleft
+        self.image = pg.transform.scale(self.image,self.danmaku_type[type][1])
+        self.original_image = self.image #回転用元画像
+        self.angle = angle
+        if type=="missile":
+            self.rect.topleft = (bossrect.x -120, bossrect.y)
+        if type == "danmaku" or type == "beam":
+            self.image.set_colorkey((0, 0, 0))
+            self.image = pg.transform.rotate(self.original_image, self.angle+180)#回転
+            self.rect = self.image.get_rect(center=self.rect.center) # 回転後の座標調整
+            self.vx=anglevector(self.angle)[0]
+            self.vy=anglevector(self.angle)[1]
+       
+        self.speed = self.danmaku_type[type][2]
+        self.list=[0,0]
+        self.count = 0
+    def update(self,screen,playerrect):
+        self.count += 1
+        self.rect.move_ip(round(self.speed*self.vx,10),round(self.speed*self.vy,10))
+        if self.type=="missile":
+            self.image = pg.transform.rotate(self.original_image, self.angle+180)#回転
+            self.rect = self.image.get_rect(center=self.rect.center)  # 回転後の座標調整
+            self.speed+=0.4
+            if self.count < 50:
+                self.speed-=0.2
+                self.angle = facing(self.rect,playerrect)
+                self.vx=anglevector(self.angle)[0]
+                self.vy=anglevector(self.angle)[1]
+        if self.type=="danmaku":
+            self.image.set_colorkey((0, 0, 0))
+            if self.speed > 1.5:
+                self.speed-=0.01
+        if self.type=="beam":
+            self.image.set_alpha(160)#透明度
+            self.speed+=0.01
+            if self.list[0]<8:#8回だけバウンド
+                self.vx*=self.bound[check_bound(self.rect)][0]
+                self.vy*=self.bound[check_bound(self.rect)][1]
+                if check_bound(self.rect)!=(True,True):
+                    self.list[0]+=1
+            
+            
+
+        screen.blit(self.image,self.rect)
+        if check_inscreen(self.rect) != (True, True):
+            self.kill()
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -127,9 +379,11 @@ def main():
     player = Player((900, 400))
     boss = pg.sprite.Group()
     boss.add(Boss())#こうかとんを出現
+    bosscolor=Bosscolor(boss.sprites()[0].rect,(0,0,0))#こうかとんを出現2
+    danmaku = pg.sprite.Group()
     tmr = 0
     clock = pg.time.Clock()
-     #----デバック用テキスト----
+    #----デバック用テキスト----
     fonto = pg.font.Font(None, 20)
     txt = fonto.render("test", False, (255, 255, 255))
     #------------------------
@@ -137,7 +391,9 @@ def main():
         screen.blit(bg_img, [0,0])
          #----デバック用テキスト----
         if boss.sprites():
-            txt = fonto.render(f"{boss.sprites()[0].rect,boss.sprites()[0].rect.center,boss.sprites()[0].movestate}", False, (255, 255, 255))
+            txt = fonto.render(f"{boss.sprites()[0].rect,boss.sprites()[0].rect.center,boss.sprites()[0].state}", False, (255, 255, 255))
+        #f danmaku.sprites():
+         #   txt = fonto.render(f"{danmaku.sprites()[0].vx,danmaku.sprites()[0].vy,danmaku.sprites()[0].angle}",False,(255,255,255))
 
         screen.blit(txt, [0, 0])
         #------------------------
@@ -145,8 +401,15 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-        boss.update()
-        boss.draw(screen)
+            #----デバック用----
+            if event.type == pg.KEYDOWN and event.key == pg.K_0:
+                boss.sprites()[0].state="reset"
+            if event.type == pg.KEYDOWN and event.key == pg.K_1:
+                boss.sprites()[0].state="attack3"
+            #-----------------    
+        boss.update(screen,danmaku,player.rect)
+        danmaku.update(screen, player.rect)
+        bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count)
         player.update(key_lst, screen)
         pg.display.update()
         tmr += 1
