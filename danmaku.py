@@ -73,13 +73,13 @@ def retire(screen: pg.Surface) -> None:
     引数：screen
     Retireの表示
     """
-    clear_out_img = pg.Surface((WIDTH,HEIGHT))
-    pg.draw.rect(clear_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
-    clear_out_img.set_alpha(0)
+    retire_out_img = pg.Surface((WIDTH,HEIGHT))
+    pg.draw.rect(retire_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
+    retire_out_img.set_alpha(0)
     fonto = pg.font.Font(None, 80)
     txt = fonto.render("Retire...", True, (255, 255, 255))  # 文字の設定
     
-    screen.blit(clear_out_img,(0, 0))
+    screen.blit(retire_out_img,(0, 0))
     screen.blit(txt, (450, 250))
     pg.display.update()  
     time.sleep(5)
@@ -563,6 +563,9 @@ def main():
     last_item_spawn = 0  #最後に現れたアイテムの時間
     next_spawn_interval = 200 #次にアイテムが出るまでの時間    boss = pg.sprite.Group()
     boss.add(Boss())#こうかとんを出現
+    pg.mixer.init()
+    pg.mixer.music.load("fig/fight.mp3")
+    pg.mixer.music.play(-1)
     bosscolor=Bosscolor(boss.sprites()[0].rect,(0,0,0))#こうかとんを出現2
     danmaku = pg.sprite.Group()    
     my_life = pg.sprite.Group()
@@ -662,14 +665,23 @@ def main():
         bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count)     
 
         if event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE:
+                pg.mixer.init()
+                pg.mixer.music.load("fig/death.mp3")
+                pg.mixer.music.play()
                 retire(screen)  # backspaceキーでリタイア
                 return
         
         if player.hp == 0:  # プレイヤーのHPが0になったらgameover
+            pg.mixer.init()
+            pg.mixer.music.load("fig/death.mp3")
+            pg.mixer.music.play()
             gameover(screen)
             return
         
-        if boss.sprites()[0].hp == 0:  # ボスのHPｇが0になったらgameclear
+        if boss.sprites()[0].hp == 70:  # ボスのHPｇが0になったらgameclear
+            pg.mixer.init()
+            pg.mixer.music.load("fig/clear.mp3")
+            pg.mixer.music.play()
             gameclear(screen)
             return
 
