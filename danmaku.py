@@ -68,6 +68,21 @@ def gameclear(screen: pg.Surface) -> None:
     time.sleep(5)
 
 
+def retire(screen: pg.Surface) -> None:
+    """
+    引数：screen
+    Retireの表示
+    """
+    clear_out_img = pg.Surface((WIDTH,HEIGHT))
+    pg.draw.rect(clear_out_img, (255, 0, 0), (0, 0, WIDTH, HEIGHT))
+    clear_out_img.set_alpha(0)
+    fonto = pg.font.Font(None, 80)
+    txt = fonto.render("Retire...", True, (255, 255, 255))  # 文字の設定
+    
+    screen.blit(clear_out_img,(0, 0))
+    screen.blit(txt, (450, 250))
+    pg.display.update()  
+    time.sleep(5)
 
 
 
@@ -534,7 +549,7 @@ class Boss_Life(pg.sprite.Sprite):
 
 
 def main():
-    pg.display.set_caption("爆散！こうかとん")
+    pg.display.set_caption("墜ちろ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/26466996.jpg")
     bg_img2 = pg.transform.flip(bg_img, True, False) 
@@ -641,18 +656,22 @@ def main():
             player.fast_beam_tmr -= 1
         if player.shield_tmr > 0:
             player.shield_tmr -= 1
-            #----デバック用----
-            if event.type == pg.KEYDOWN and event.key == pg.K_0:
-                boss.sprites()[0].state="reset"
-            if event.type == pg.KEYDOWN and event.key == pg.K_1:
-                boss.sprites()[0].state="attack3"
-            #-----------------    
+        
         boss.update(screen,danmaku,player.rect)
         danmaku.update(screen, player.rect)
-        bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count)            
+        bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count)     
+
         if event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE:
-                gameclear(screen)  # 敵や爆弾の設定が出来次第、条件は変更
+                retire(screen)  # backspaceキーでリタイア
                 return
+        
+        if player.hp == 0:  # プレイヤーのHPが0になったらgameover
+            gameover(screen)
+            return
+        
+        if boss.sprites()[0].hp == 0:  # ボスのHPｇが0になったらgameclear
+            gameclear(screen)
+            return
 
         player.update(key_lst, screen)
         items = [item for item in items if item.update(screen, tmr)]          
