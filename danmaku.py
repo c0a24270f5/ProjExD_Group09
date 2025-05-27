@@ -67,22 +67,46 @@ class Player(pg.sprite.Sprite):
 
 
 def main():
-    pg.display.set_caption("真！こうかとん無双")
+    pg.display.set_caption("")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/26466996.jpg")
+    bg_img2 = pg.transform.flip(bg_img, True, False) 
+    bg_width = bg_img.get_width()  # bg_imgの横幅の取得
 
     player = Player((900, 400))
 
     tmr = 0
+    scrollspeed = 0  # 背景画像の移動スピード
+    accelerate = 0.1  # 背景画像の加速度
+    maxspeed = 100
+    scrollposition = 0  # 背景画像の位置座標
     clock = pg.time.Clock()
+
     while True:
-        screen.blit(bg_img, [0,0])
+        screen.blit(bg_img, [0,0]) 
+  # --------------画面移動のプログラム----------------
+        scrollposition += scrollspeed
+        scrollposition %= bg_width * 2
+        if scrollspeed < maxspeed:
+            speed = tmr * (accelerate**5)  # 背景画像の加速度
+            scrollspeed += speed
+            screen.blit(bg_img, [-scrollposition, 0]) 
+            screen.blit(bg_img2, [-scrollposition+bg_width, 0]) 
+            screen.blit(bg_img, [-scrollposition+bg_width*2, 0])
+        else:  # スクロールするスピードが指定したスピードになると速度が一定になる
+            scrollspeed = maxspeed
+            screen.blit(bg_img, [-scrollposition, 0]) 
+            screen.blit(bg_img2, [-scrollposition+bg_width, 0]) 
+            screen.blit(bg_img, [-scrollposition+bg_width*2, 0])
+  # -------------------------------------------------
+
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
 
         player.update(key_lst, screen)
+        print(f" timer = {tmr}                      speed = {int(scrollspeed)}")
         pg.display.update()
         tmr += 1
         clock.tick(50)
