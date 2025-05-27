@@ -219,8 +219,7 @@ class Boss(pg.sprite.Sprite):
         self.vx, self.vy,self.vx_sub, self.vy_sub = 0,0,0,0
         self.danmaku_cooltime=100
         self.cooltime=0
-        self.maxhp=1000
-        self.hp=self.maxhp
+        self.hp=80
         self.count=0
         self.speed=10
         self.speed_sub=0
@@ -269,7 +268,6 @@ class Boss(pg.sprite.Sprite):
                 self.random[1]=random.randint(0,HEIGHT)
 
         if self.state == "start":
-            self.hp=self.maxhp
             if self.rect.centerx > self.stop_xy[0]:
                 self.rect.move_ip(-1,0)
                 if self.rect.centerx < self.stop_xy[0]:
@@ -504,6 +502,35 @@ class My_Life(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.topleft = (5, 5)
 
+class Boss_Life(pg.sprite.Sprite):
+    """
+    ボスのHP表示に関するクラス
+    """
+    def __init__(self, boss: Boss):
+        super().__init__()
+        self.boss = boss
+        self.image = pg.Surface((boss.hp * 10, 20))
+        pg.draw.rect(self.image, (255, 0, 0), (0, 0, boss.hp * 10, 20))
+        self.rect = self.image.get_rect()
+        self.rect.topright = (WIDTH-5, 5)
+
+
+    def update(self):
+        hp = self.boss.hp
+        bar_width = max(hp * 10, 1)
+        bar_height = 20
+
+        # 新しいSurfaceを作成（透明背景）
+        self.image = pg.Surface((bar_width , bar_height), pg.SRCALPHA)
+        self.image.fill((0, 0, 0, 0))
+
+        # ライフバーを描画
+        pg.draw.rect(self.image, (255, 0, 0), (0, 0, bar_width, bar_height))
+
+        # rectも更新
+        self.rect = self.image.get_rect()
+        self.rect.topright = (WIDTH-5, 5)
+
 
 
 def main():
@@ -526,6 +553,9 @@ def main():
     my_life = pg.sprite.Group()
     my_life_bar = My_Life(player)
     my_life.add(my_life_bar)
+    boss_life = pg.sprite.Group()
+    boss_life_bar = Boss_Life(boss.sprites()[0])
+    boss_life.add(boss_life_bar)
 
 
     tmr = 0
@@ -637,6 +667,8 @@ def main():
 
         my_life.update()
         my_life.draw(screen)
+        boss_life.update()
+        boss_life.draw(screen)
 
         print(f" timer = {tmr}                      speed = {int(scrollspeed)}")
         pg.display.update()
