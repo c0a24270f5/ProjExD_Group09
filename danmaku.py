@@ -113,6 +113,7 @@ class Player(pg.sprite.Sprite):
         self.fast_beam_tmr = 0 #ビームのクールタイムが短くなる時間
         self.shield_tmr = 0 #バリアの時間
         self.hp = 3
+        self.hitbox=pg.Rect(self.rect.x+10, self.rect.y+10, 30, 30) #プレイヤーの当たり判定
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
@@ -120,6 +121,7 @@ class Player(pg.sprite.Sprite):
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
         """
+        self.hitbox=pg.Rect(self.rect.x+10, self.rect.y+10, 30, 30) #プレイヤーの当たり判定
         sum_mv = [0, 0]
         for k, mv in __class__.delta.items():
             if key_lst[k]:
@@ -225,10 +227,11 @@ class Boss(pg.sprite.Sprite):
     """
     def __init__(self):
         super().__init__()
+        self.image_path="fig/3.png"
         self.image = pg.image.load(f"fig/3.png")
         self.rect = self.image.get_rect()
         self.rect.center = 1200,HEIGHT/2-50
-        self.state,self.state_num = "start",0
+        self.state,self.keitai,self.state_num = "start","1",0
         self.image = pg.transform.scale(self.image,(200,200))
         self.stop_xy =[900,HEIGHT/2-50]  # 停止位置を指定 
         self.vx, self.vy,self.vx_sub, self.vy_sub = 0,0,0,0
@@ -240,16 +243,159 @@ class Boss(pg.sprite.Sprite):
         self.speed_sub=0
         self.random=[0,0,0,0]#[x,y,angle1,angle2]
         self.keep_xy=[0,0]
+        self.circle_size=0
+        self.hitbox=pg.Rect(self.rect.x, self.rect.y, 200, 200) #ボスの当たり判定
         self.state_dict={
             0:"attack0",
             1:"attack1",
             2:"attack2",
             3:"attack3",
             4:"attack4",
-            5:"attack5"
+            5:"attack5",
+            6:"attack6",
+            7:"attack7",
         }
-        
-    def update(self,screen,danmaku,playerrect):
+
+    def start(self):
+        if self.rect.centerx > self.stop_xy[0]:
+            self.rect.move_ip(-1,0)
+            if self.rect.centerx < self.stop_xy[0]:
+                self.rect.centerx = self.stop_xy[0]
+        if self.rect.centerx == self.stop_xy[0] and self.count==500:
+            self.state = "reset"
+
+    def missile1(self,danmaku,playerrect):
+        self.speed=4
+        self.image = pg.image.load(f"fig/9.png")
+        self.image_path="fig/9.png"
+        if self.count%200==1:
+            self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+            self.random[1]=random.randint(0,HEIGHT)
+        if 30>self.count%50>0:
+            self.speed_sub+=0.8
+        if self.count%50==30:
+            self.speed_sub=0
+        if 50>self.count%50>30:
+            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
+        if self.count%50==0:
+            self.speed_sub=-10
+            self.vx_sub,self.vy_sub=anglevector(facing(self.rect,playerrect))
+            danmaku.add(Danmaku("missile",self.rect,0))
+        if self.count>200:
+            self.cooltime=100
+            self.state = "reset"
+
+    def missile2(self,danmaku):
+        self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
+        self.image = pg.image.load(f"fig/3.png")
+        self.image_path="fig/3.png"
+        self.image = pg.transform.scale(self.image,(200,200))
+        if self.count==1:
+            self.speed=4
+            self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+            self.random[1]=0
+        if self.rect.centery<10:
+            self.speed=9
+            self.random[0]=random.randint(int(WIDTH/2),WIDTH)
+            self.random[1]=HEIGHT
+            self.state_num=1
+        if self.state_num==1:
+            self.image = pg.image.load(f"fig/9.png")
+            self.image_path="fig/9.png"
+            if self.count%13==0:
+                danmaku.add(Danmaku("missile",self.rect,0))
+        if self.rect.centery>HEIGHT-10:
+            self.cooltime=100   
+            self.state = "reset"
+
+    def circle_danmaku(self,danmaku):
+        self.speed = 6
+        self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
+        if  self.count%40==0:
+            self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
+            self.random[1]=random.randint(0,HEIGHT)
+        if self.count%50==0:
+            self.image = pg.image.load(f"fig/6.png")
+            self.image_path="fig/6.png"
+            self.state_num+=1
+            for i in range(27):#弾幕の数
+                danmaku.add(Danmaku("danmaku",self.rect,(i-180)*15))#弾幕を発射
+        if self.count >200:#countが200以上で終了
+            self.cooltime=100
+            self.state = "reset"
+
+    def tossin(self,danmaku):
+        if self.count==1:
+            self.vx,self.vy=0,-2#上に行く
+        if check_bound(self.rect) == (True, False):#画面恥に行ったらｖyを反転
+            self.vy=self.vy*-1
+        if self.count==110:
+            self.vx,self.vy=3,0
+        if self.count>110:
+            self.vx-=0.2
+        if self.vx<0:
+            if self.vx>-1:
+                self.keep_xy[0]=self.rect.centerx
+                self.random[2]=random.randint(0,90)+45
+                self.random[3]=self.random[2]+180
+            if self.rect.centerx<self.keep_xy[0]-180*self.state_num+1 and self.vx<-1:#180が弾幕のx軸の感覚
+                self.state_num+=1
+                danmaku.add(Danmaku("danmaku",self.rect,self.random[2],WIDTH-30*self.state_num+1))
+                danmaku.add(Danmaku("danmaku",self.rect,self.random[3],WIDTH-30*self.state_num+1))
+            if self.vx<-5:
+                if check_bound(self.rect) == (False, False) or check_bound(self.rect) == (False, True) :
+                    self.cooltime=200
+                    self.state = "reset"
+
+    def hansya_danmaku(self,danmaku):
+        self.speed = 6
+        self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
+        if  self.count%40==0:
+            self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
+            self.random[1]=random.randint(0,HEIGHT)
+        if self.count==100:
+            self.image = pg.image.load(f"fig/6.png")
+            self.image_path="fig/6.png"
+            self.state_num+=1
+            danmaku.add(Danmaku("beam",self.rect,random.randint(0,140)-210))#弾幕を発射
+        if self.count >200:#countが200以上で終了
+            self.cooltime=100
+            self.state = "reset"
+
+    def kaiten_danmaku(self,danmaku):
+        self.speed = 10
+        self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#中心へ向かう
+        if  self.count==1:
+            self.random[2]=0.4
+            self.random[0]=WIDTH/2-50
+            self.random[1]=HEIGHT/2-50
+        if self.count>100:
+            self.random[2]+=0.05
+            self.image = pg.image.load(f"fig/6.png")
+            self.image_path="fig/6.png"
+            if self.count%3==0:
+                self.state_num+=self.random[2]
+                danmaku.add(Danmaku("danmaku2",self.rect,self.state_num+90))#弾幕を発射
+                danmaku.add(Danmaku("danmaku2",self.rect,self.state_num-90))#弾幕を発射
+        if self.count >400:#countが200以上で終了
+            self.cooltime=100
+            self.state = "reset"
+
+    def minikoukaton(self,minikoukaton):
+        self.image = pg.image.load(f"fig/10.png")
+        self.image_path = "fig/10.png"
+        self.speed = 3
+        self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
+        if  self.count%60==0:
+            self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
+            self.random[1]=random.randint(0,HEIGHT)
+            minikoukaton.add(Minikoukaton("minikoukaton",self.rect,random.randint(0,1)*180+90))#みにこうかとん出現
+        if self.count >200:#countが200以上で終了
+            self.cooltime=10
+            self.state = "reset"
+
+    def update(self,screen,danmaku,playerrect,minikoukaton):
+        self.hitbox=pg.Rect(self.rect.x, self.rect.y, 200, 200) #当たり時判定更新
         self.count+=1
         if self.state != "attack4":
             if abs(self.rect.centerx - self.random[0]) < abs(self.speed* self.vx) or abs(self.rect.centery - self.random[1]) < abs(self.speed* self.vy):
@@ -257,16 +403,17 @@ class Boss(pg.sprite.Sprite):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if self.speed_sub != 0:
             self.rect.move_ip(self.speed_sub*self.vx_sub,self.speed_sub*self.vy_sub)
-
         if self.state == "reset":
             self.speed=6
             self.speed_sub=0
             self.count = 1
             self.state_num=0
             self.state = "random"
-
+            self.random[2]=0
+            
         if self.state == "random":
             self.image = pg.image.load(f"fig/3.png")
+            self.image_path="fig/3.png"
             self.image = pg.transform.scale(self.image,(200,200))
             if  self.count%20==0:
                 self.random[0]=random.randint(int(WIDTH/2),WIDTH)
@@ -278,113 +425,25 @@ class Boss(pg.sprite.Sprite):
             if self.count>=self.cooltime:
                 self.cooltime=0
                 self.count = 1
-                self.state=self.state_dict[random.randint(1,5)] #攻撃ランダム
+                self.state=self.state_dict[random.randint(1,7)] #攻撃ランダム
                 self.random[0]=random.randint(int(WIDTH/2),WIDTH)
                 self.random[1]=random.randint(0,HEIGHT)
-
         if self.state == "start":
-            if self.rect.centerx > self.stop_xy[0]:
-                self.rect.move_ip(-1,0)
-                if self.rect.centerx < self.stop_xy[0]:
-                    self.rect.centerx = self.stop_xy[0]
-            if self.rect.centerx == self.stop_xy[0] and self.count==500:
-                self.state = "reset"
-
+            self.start()
         if self.state=="attack1":   #ミサイル1
-            self.speed=4
-            self.danmaku_cooltime=50
-            self.image = pg.image.load(f"fig/9.png")
-            if self.count%200==1:
-                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
-                self.random[1]=random.randint(0,HEIGHT)
-            if self.danmaku_cooltime*3/5>self.count%self.danmaku_cooltime>0:
-                self.speed_sub+=0.8
-            if self.count%self.danmaku_cooltime==self.danmaku_cooltime*3/5:
-                self.speed_sub=0
-            if self.danmaku_cooltime>self.count%self.danmaku_cooltime>self.danmaku_cooltime*3/5:
-                self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
-            if self.count%self.danmaku_cooltime==0:
-                self.speed_sub=-10
-                self.vx_sub,self.vy_sub=anglevector(facing(self.rect,playerrect))
-                danmaku.add(Danmaku("missile",self.rect,0))
-            if self.count>200:
-                self.cooltime=100
-                self.state = "reset"
-
+            self.missile1(danmaku,playerrect)
         if self.state=="attack2":   #ミサイル２
-            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)
-            self.danmaku_cooltime=13
-            self.image = pg.image.load(f"fig/3.png")
-            self.image = pg.transform.scale(self.image,(200,200))
-            if self.count==1:
-                self.speed=4
-                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
-                self.random[1]=0
-            if self.rect.centery<10:
-                self.speed=9
-                self.random[0]=random.randint(int(WIDTH/2),WIDTH)
-                self.random[1]=HEIGHT
-                self.state_num=1
-            if self.state_num==1:
-                self.image = pg.image.load(f"fig/9.png")
-                if self.count%self.danmaku_cooltime==0:
-                    danmaku.add(Danmaku("missile",self.rect,0))
-            if self.rect.centery>HEIGHT-10:
-                self.cooltime=100   
-                self.state = "reset"
-
+            self.missile2(danmaku)
         if self.state=="attack3":   #円形弾幕
-            self.speed = 6
-            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
-            if  self.count%40==0:
-                self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
-                self.random[1]=random.randint(0,HEIGHT)
-            if self.count%50==0:
-                self.image = pg.image.load(f"fig/6.png")
-                self.state_num+=1
-                for i in range(27):#弾幕の数
-                    danmaku.add(Danmaku("danmaku",self.rect,(i-180)*15))#弾幕を発射
-            if self.count >200:#countが200以上で終了
-                self.cooltime=100
-                self.state = "reset"
-
+            self.circle_danmaku(danmaku)
         if self.state=="attack4": #突進弾幕
-            if self.count==1:
-                self.vx,self.vy=0,-2#上に行く
-            if check_bound(self.rect) == (True, False):#画面恥に行ったらｖyを反転
-                self.vy=self.vy*-1
-            if self.count==110:
-                self.vx,self.vy=3,0
-            if self.count>110:
-                self.vx-=0.2
-            if self.vx<0:
-                if self.vx>-1:
-                    self.keep_xy[0]=self.rect.centerx
-                    self.random[2]=random.randint(0,90)+45
-                    self.random[3]=self.random[2]+180
-                if self.rect.centerx<self.keep_xy[0]-180*self.state_num+1 and self.vx<-1:#180が弾幕のx軸の感覚
-                    self.state_num+=1
-                    danmaku.add(Danmaku("danmaku",self.rect,self.random[2],WIDTH-30*self.state_num+1))
-                    danmaku.add(Danmaku("danmaku",self.rect,self.random[3],WIDTH-30*self.state_num+1))
-                if self.vx<-5:
-                    if check_bound(self.rect) == (False, False) or check_bound(self.rect) == (False, True) :
-                        self.cooltime=200
-                        self.state = "reset"
+            self.tossin(danmaku)
         if self.state=="attack5": #ビーム
-            self.speed = 6
-            self.vx, self.vy = calc_orientation([self.rect.centerx,self.rect.centery],self.random)#ランダムな方向へ向かう
-            if  self.count%40==0:
-                self.random[0]=random.randint(int(WIDTH-WIDTH/4),WIDTH)#ランダムな方向を設定
-                self.random[1]=random.randint(0,HEIGHT)
-            if self.count==100:
-                self.image = pg.image.load(f"fig/6.png")
-                self.state_num+=1
-                danmaku.add(Danmaku("beam",self.rect,random.randint(0,140)-210))#弾幕を発射
-            if self.count >200:#countが200以上で終了
-                self.cooltime=100
-                self.state = "reset"
-                        
-
+            self.hansya_danmaku(danmaku)
+        if self.state=="attack6": #回転弾幕
+            self.kaiten_danmaku(danmaku)
+        if self.state=="attack7": #ミニこうかとん召喚
+            self.minikoukaton(minikoukaton)
         screen.blit(self.image,self.rect) 
             
 
@@ -393,20 +452,79 @@ class Bosscolor(pg.sprite.Sprite):
     """
     ボスの色を変えるクラス
     """
-    def __init__(self,bossrect,color):
+    def __init__(self,bossrect,image,type):
         super().__init__()
+        self.image_path=image
+        self.type=type
         self.image = pg.image.load(f"fig/3.png").convert_alpha()
-        self.rect = bossrect
         self.image = pg.transform.scale(self.image,(200,200))
-        self.image.fill(color, special_flags=pg.BLEND_RGB_MULT)
-        self.alpha=255
-        self.num=0
-    def update(self,screen,bossrect,count):
-        self.num+=0.03
-        if self.alpha > 0 and count > 400:
+        self.rect = bossrect
+        self.tmr=0
+    def update(self,screen,bossrect,count,image):
+        if self.tmr==0:
+            self.image = pg.image.load(image).convert_alpha()
+            if image=="fig/3.png":
+                    self.image = pg.transform.scale(self.image,(200,200))
+            if self.type=="start":
+                self.image.fill((0,0,0), special_flags=pg.BLEND_RGB_MULT)
+                self.alpha=255
+                self.num=0
+            if self.type=="damage":
+                self.image.fill((0,150,150), special_flags=pg.BLEND_RGB_SUB)
+                self.alpha=130
+                self.num=6
+            if self.type=="kirari":
+                self.image.fill((255,255,255), special_flags=pg.BLEND_RGB_ADD)
+                self.alpha=200
+                self.num=5  
+        if self.num <40:
+            self.num+=0.03
+        if self.alpha>0 and count>400:
+            self.alpha -= self.num
+        if self.type=="damage":
             self.alpha -= self.num
         self.image.set_alpha(self.alpha)
-        screen.blit(self.image,bossrect) 
+        screen.blit(self.image,bossrect)
+        self.tmr+=1
+        if self.alpha <= 0:
+            self.kill()
+class Minikoukaton(pg.sprite.Sprite):
+    """
+    ミニこうかとんに関するクラス
+    """
+    def __init__(self,type,bossrect,angle):
+        super().__init__()
+        self.type=type
+        self.danmaku_type={ #名前：[画像,サイズ,スピード]
+            "minikoukaton":["fig/3.png",(70,70),1.7]
+            }
+        self.summonpoint={
+            90:[(random.randint(int(WIDTH/4),WIDTH),HEIGHT),-2],
+            270:[(random.randint(int(WIDTH/4),WIDTH),0),2]
+        }
+        self.angle = angle
+        self.vx=0
+        self.vy=self.summonpoint[self.angle][1]
+        self.rad = math.radians(angle)
+        self.image =  pg.image.load(self.danmaku_type[type][0])
+        self.rect = self.image.get_rect()
+        self.rect.topleft = bossrect.topleft
+        self.image = pg.transform.scale(self.image,self.danmaku_type[type][1])
+        self.rect.topleft=self.summonpoint[self.angle][0]
+        self.speed = self.danmaku_type[type][2]
+        self.random=random.randint(0,50)
+        self.count = 0
+    def update(self,screen,playerrect,danmaku):
+        self.image.set_colorkey((0, 0, 0))
+        self.count += 1
+        self.rect.move_ip(round(self.speed*self.vx,10),round(self.speed*self.vy,10))
+        if self.count%(60+self.random)==0:
+            danmaku.add(Danmaku("danmaku",self.rect,facing(self.rect,playerrect)))
+            danmaku.add(Danmaku("danmaku",self.rect,facing(self.rect,playerrect)+20))
+            danmaku.add(Danmaku("danmaku",self.rect,facing(self.rect,playerrect)-20))
+        screen.blit(self.image,self.rect)
+        if self.count>=400:
+            self.kill()
 
 
 class Danmaku(pg.sprite.Sprite):
@@ -419,13 +537,19 @@ class Danmaku(pg.sprite.Sprite):
         self.danmaku_type={ #名前：[画像,サイズ,スピード]
             "missile":["fig/missile.png",(160,70),0],
             "danmaku":["fig/circle.png",(48,12),6.44],
-            "beam":["fig/circle.png",(120,120),10]
+            "danmaku2":["fig/circle.png",(48,12),12],
+            "beam":["fig/circle.png",(120,120),10],
+            "minikoukaton":["fig/10.png",(50,50),2]
             }
         self.bound={
             (True,True):[1,1],
             (True,False):[1,-1],
             (False,True):[-1,1],
             (False,False):[-1,-1]
+        }
+        self.summonpoint={
+            90:(random.randint(int(WIDTH/4),WIDTH),HEIGHT),
+            270:(random.randint(int(WIDTH/4),WIDTH),0)
         }
         if self.danmaku_type[type][0] != "None":
             self.image = pg.image.load(self.danmaku_type[type][0]).convert_alpha()
@@ -440,17 +564,21 @@ class Danmaku(pg.sprite.Sprite):
         self.angle = angle
         if type=="missile":
             self.rect.topleft = (bossrect.x -120, bossrect.y)
-        if type == "danmaku" or type == "beam":
+        if type=="danmaku2":
+            self.rect.topleft = (WIDTH/2-50,HEIGHT/2-50)
+        if type=="minikoukaton":
+            self.rect.topleft=self.summonpoint[angle]
+        if type !="missile" or type != "minikoukaton":
             self.image.set_colorkey((0, 0, 0))
             self.image = pg.transform.rotate(self.original_image, self.angle+180)#回転
             self.rect = self.image.get_rect(center=self.rect.center) # 回転後の座標調整
             self.vx=anglevector(self.angle)[0]
             self.vy=anglevector(self.angle)[1]
-       
         self.speed = self.danmaku_type[type][2]
         self.list=[0,0]
         self.count = 0
     def update(self,screen,playerrect):
+        self.image.set_colorkey((0, 0, 0))
         self.count += 1
         self.rect.move_ip(round(self.speed*self.vx,10),round(self.speed*self.vy,10))
         if self.type=="missile":
@@ -463,7 +591,6 @@ class Danmaku(pg.sprite.Sprite):
                 self.vx=anglevector(self.angle)[0]
                 self.vy=anglevector(self.angle)[1]
         if self.type=="danmaku":
-            self.image.set_colorkey((0, 0, 0))
             if self.speed > 1.5:
                 self.speed-=0.01
         if self.type=="beam":
@@ -474,9 +601,7 @@ class Danmaku(pg.sprite.Sprite):
                 self.vy*=self.bound[check_bound(self.rect)][1]
                 if check_bound(self.rect)!=(True,True):
                     self.list[0]+=1
-            
-            
-
+        self.image.set_colorkey((0, 0, 0))
         screen.blit(self.image,self.rect)
         if check_inscreen(self.rect) != (True, True):
             self.kill()
@@ -555,7 +680,7 @@ def main():
     bg_img2 = pg.transform.flip(bg_img, True, False) 
     bg_width = bg_img.get_width()  # bg_imgの横幅の取得
 
-    player = Player((900, 400))
+    player = Player((200, HEIGHT/2))
     boss = pg.sprite.Group()
     beams = []
     items = []
@@ -566,8 +691,10 @@ def main():
     pg.mixer.init()
     pg.mixer.music.load("fig/fight.mp3")
     pg.mixer.music.play(-1)
-    bosscolor=Bosscolor(boss.sprites()[0].rect,(0,0,0))#こうかとんを出現2
-    danmaku = pg.sprite.Group()    
+    bosscolor=pg.sprite.Group()#こうかとんを出現2
+    bosscolor.add(Bosscolor(boss.sprites()[0].rect,boss.sprites()[0].image_path,"start"))
+    danmaku = pg.sprite.Group()
+    minikoukaton = pg.sprite.Group()     
     my_life = pg.sprite.Group()
     my_life_bar = My_Life(player)
     my_life.add(my_life_bar)
@@ -582,9 +709,11 @@ def main():
     maxspeed = 100
     scrollposition = 0  # 背景画像の位置座標
     clock = pg.time.Clock()
+    mutekijikan = 0
 
     while True:
         screen.blit(bg_img, [0,0]) 
+        mutekijikan += 1
   # --------------画面移動のプログラム----------------
         scrollposition += scrollspeed
         scrollposition %= bg_width * 2
@@ -605,13 +734,22 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-        for danmaku_hit in pg.sprite.spritecollide(player, danmaku, True):  # プレイやーと衝突した弾幕リスト
-            if player.shield_tmr == 0:
-                player.hp-=1#プレイヤーが当たった時にhp-1
+        for danmaku_hit in danmaku:
+            if player.hitbox.colliderect(danmaku_hit.rect): # プレイやーと衝突した弾幕リスト
+                danmaku.remove(danmaku_hit)
+                if player.shield_tmr == 0 and  mutekijikan>=30:
+                    player.hp-=1#プレイヤーが当たった時にhp-1
+                    mutekijikan =0
         for baem in beams:
-            if boss.sprites()[0].rect.colliderect(baem.rct):
+            if boss.sprites()[0].hitbox.colliderect(baem.rct): #ボスのダメージ判定
                 boss.sprites()[0].hp-=1
                 beams.remove(baem)
+                if tmr>400:
+                    bosscolor.add(Bosscolor(boss.sprites()[0].rect,boss.sprites()[0].image_path,"damage"))
+            for minikoukaton_hit in minikoukaton:
+                if minikoukaton_hit.rect.colliderect(baem.rct):
+                    minikoukaton_hit.kill()
+
         current_time = pg.time.get_ticks() #現在の時間
 
         if player.fast_beam_tmr > 0:
@@ -660,9 +798,10 @@ def main():
         if player.shield_tmr > 0:
             player.shield_tmr -= 1
         
-        boss.update(screen,danmaku,player.rect)
-        danmaku.update(screen, player.rect)
-        bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count)     
+        boss.update(screen,danmaku,player.rect,minikoukaton)
+        minikoukaton.update(screen, player.rect,danmaku)
+        bosscolor.update(screen,boss.sprites()[0].rect,boss.sprites()[0].count,boss.sprites()[0].image_path)
+        danmaku.update(screen, player.rect) 
 
         if event.type == pg.KEYDOWN and event.key == pg.K_BACKSPACE:
                 pg.mixer.init()
@@ -678,7 +817,7 @@ def main():
             gameover(screen)
             return
         
-        if boss.sprites()[0].hp == 70:  # ボスのHPｇが0になったらgameclear
+        if boss.sprites()[0].hp == 0:  # ボスのHPｇが0になったらgameclear
             pg.mixer.init()
             pg.mixer.music.load("fig/clear.mp3")
             pg.mixer.music.play()
